@@ -2,7 +2,9 @@ package com.mohnaexpress.app.data.api
 
 import com.google.gson.GsonBuilder
 import com.mohnaexpress.app.data.model.*
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Response
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -11,73 +13,117 @@ import java.util.concurrent.TimeUnit
 
 interface ApiService {
 
-    @GET("exec")
-    suspend fun getInitStoreData(
-        @Query("action") action: String = "getInitStoreData"
-    ): InitStoreResponse
+    // 1. Catalog & Initial Store Data Endpoints
+    @GET("products")
+    suspend fun getProducts(
+        @Query("select") select: String = "*"
+    ): List<Product>
 
-    @GET("exec")
-    suspend fun validateSession(
-        @Query("action") action: String = "validateSession",
-        @Query("token") token: String
-    ): SessionStatusResponse
+    @GET("categories")
+    suspend fun getCategories(
+        @Query("select") select: String = "*"
+    ): List<Category>
 
-    @GET("exec")
-    suspend fun userPasswordLogin(
-        @Query("action") action: String = "userPasswordLogin",
+    @GET("coupons")
+    suspend fun getCoupons(
+        @Query("select") select: String = "*"
+    ): List<Coupon>
+
+    @GET("reviews")
+    suspend fun getReviews(
+        @Query("select") select: String = "*"
+    ): List<Review>
+
+    @GET("delivery_zones")
+    suspend fun getDeliveryZones(
+        @Query("select") select: String = "*"
+    ): List<DeliveryZone>
+
+    @GET("orders")
+    suspend fun getUserOrders(
+        @Query("user_email") email: String,
+        @Query("order") order: String = "order_timestamp.desc",
+        @Query("select") select: String = "*"
+    ): List<Order>
+
+    @GET("users")
+    suspend fun getUserMetadata(
         @Query("email") email: String,
-        @Query("password") pass: String
-    ): AuthResponse
+        @Query("select") select: String = "wallet_balance,session_token,status"
+    ): List<User>
 
-    @GET("exec")
-    suspend fun sendSignupOtp(
-        @Query("action") action: String = "sendSignupOtp",
+    // 2. Authentication Endpoints
+    @GET("users")
+    suspend fun loginUser(
         @Query("email") email: String,
-        @Query("phone") phone: String
-    ): AuthResponse
-
-    @GET("exec")
-    suspend fun completeSignup(
-        @Query("action") action: String = "completeSignup",
-        @Query("name") name: String,
-        @Query("email") email: String,
-        @Query("phone") phone: String,
         @Query("password") pass: String,
-        @Query("otp") otp: String,
-        @Query("lat") lat: Double,
-        @Query("lng") lng: Double
-    ): AuthResponse
+        @Query("select") select: String = "*"
+    ): List<User>
 
-    @POST("exec")
-    suspend fun saveOrder(
-        @Query("action") action: String = "saveOrder",
+    @PATCH("users")
+    suspend fun updateUserSession(
+        @Query("email") email: String,
+        @Body body: UserSessionUpdate
+    ): List<User>
+
+    @GET("users")
+    suspend fun getUserSessionToken(
+        @Query("email") email: String,
+        @Query("select") select: String = "session_token"
+    ): List<UserSessionToken>
+
+    @POST("users")
+    suspend fun signupUser(
+        @Body user: UserSignupRequest
+    ): List<User>
+
+    // 3. Atomic High-Concurrency Order Placement
+    @POST("rpc/place_order")
+    suspend fun placeOrderRpc(
+        @Body payload: PlaceOrderRpcPayload
+    ): PlaceOrderResponse
+
+    @POST("orders")
+    suspend fun insertOrder(
         @Body order: Order
-    ): SaveOrderResponse
+    ): List<Order>
 
-    @GET("exec")
-    suspend fun validateCoupon(
-        @Query("action") action: String = "validateCoupon",
+    // 4. Reviews & Coupons
+    @GET("coupons")
+    suspend fun getCouponByCode(
         @Query("code") code: String,
-        @Query("zone") zone: String
-    ): AuthResponse
+        @Query("select") select: String = "*"
+    ): List<Coupon>
 
-    @GET("exec")
+    @POST("reviews")
     suspend fun submitReview(
-        @Query("action") action: String = "submitReview",
-        @Query("productId") productId: String,
-        @Query("productName") productName: String,
-        @Query("userEmail") userEmail: String,
-        @Query("userName") userName: String,
-        @Query("rating") rating: Int,
-        @Query("feedback") feedback: String
-    ): AuthResponse
+        @Body review: ReviewSubmissionRequest
+    ): List<Review>
+
+    @DELETE("reviews")
+    suspend fun deleteReview(
+        @Query("id") id: String
+    ): retrofit2.Response<Unit>
 
     companion object {
-        private const val BASE_URL = "https://script.google.com/macros/s/AKfycbwISME2C5UqmBGIH5uqRZPjh357sXmlM2fppxm3_rEss8qVoCRsZh5d6QdfTED13jpt/"
+        const val SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co/rest/v1/"
+        const val SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"
 
         fun create(): ApiService {
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
+            }
+
+            // Supabase Mandatory Headers Interceptor
+            val supabaseHeaderInterceptor = Interceptor { chain ->
+                val original = chain.request()
+                val requestBuilder = original.newBuilder()
+                    .header("apikey", SUPABASE_ANON_KEY)
+                    .header("Authorization", "Bearer $SUPABASE_ANON_KEY")
+                    .header("Content-Type", "application/json")
+                    .header("Prefer", "return=representation")
+                    .method(original.method, original.body)
+                chain.proceed(requestBuilder.build())
             }
 
             val client = OkHttpClient.Builder()
@@ -85,6 +131,7 @@ interface ApiService {
                 .followSslRedirects(true)
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(30, TimeUnit.SECONDS)
+                .addInterceptor(supabaseHeaderInterceptor)
                 .addInterceptor(logging)
                 .build()
 
@@ -93,7 +140,7 @@ interface ApiService {
                 .create()
 
             return Retrofit.Builder()
-                .baseUrl(BASE_URL)
+                .baseUrl(SUPABASE_URL)
                 .client(client)
                 .addConverterFactory(GsonConverterFactory.create(gson))
                 .build()

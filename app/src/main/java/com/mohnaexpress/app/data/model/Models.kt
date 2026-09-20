@@ -7,11 +7,11 @@ data class Product(
     @SerializedName("name") val name: String,
     @SerializedName("category") val category: String,
     @SerializedName("scope") val scope: String = "both",
-    @SerializedName("retailPrice") val retailPrice: Double = 0.0,
-    @SerializedName("wholesalePrice") val wholesalePrice: Double = 0.0,
+    @SerializedName("retail_price", alternate = ["retailPrice"]) val retailPrice: Double = 0.0,
+    @SerializedName("wholesale_price", alternate = ["wholesalePrice"]) val wholesalePrice: Double = 0.0,
     @SerializedName("mrp") val mrp: Double = 0.0,
-    @SerializedName("stockQty") val stockQty: Int = 0,
-    @SerializedName("deliveryFee") val deliveryFee: Double = 0.0,
+    @SerializedName("stock_qty", alternate = ["stockQty"]) val stockQty: Int = 0,
+    @SerializedName("delivery_fee", alternate = ["deliveryFee"]) val deliveryFee: Double = 0.0,
     @SerializedName("description") val description: String? = null,
     @SerializedName("specifications") val specifications: String? = null,
     @SerializedName("terms") val terms: String? = null,
@@ -39,22 +39,39 @@ data class Category(
 )
 
 data class Coupon(
-    @SerializedName("id") val id: String,
-    @SerializedName("code") val code: String,
-    @SerializedName("discountPercent") val discountPercent: Double,
-    @SerializedName("validUntil") val validUntil: String,
-    @SerializedName("zoneScope") val zoneScope: String = "all"
+    @SerializedName("id") val id: String = "",
+    @SerializedName("code") val code: String = "",
+    @SerializedName("discount_percent", alternate = ["discountPercent"]) val discountPercent: Double = 0.0,
+    @SerializedName("valid_until", alternate = ["validUntil"]) val validUntil: String = "",
+    @SerializedName("zone_scope", alternate = ["zoneScope"]) val zoneScope: String = "all"
 )
 
 data class Review(
     @SerializedName("id") val id: String = "",
-    @SerializedName("productId") val productId: String = "",
-    @SerializedName("productName") val productName: String = "",
-    @SerializedName("userEmail") val userEmail: String = "",
-    @SerializedName("userName") val userName: String = "",
+    @SerializedName("product_id", alternate = ["productId"]) val productId: String = "",
+    @SerializedName("product_name", alternate = ["productName"]) val productName: String = "",
+    @SerializedName("user_email", alternate = ["userEmail"]) val userEmail: String = "",
+    @SerializedName("user_name", alternate = ["userName"]) val userName: String = "",
     @SerializedName("rating") val rating: Int = 5,
     @SerializedName("feedback") val feedback: String = "",
-    @SerializedName("date") val date: String = ""
+    @SerializedName("created_at", alternate = ["date"]) val date: String = ""
+)
+
+data class ReviewSubmissionRequest(
+    @SerializedName("product_id") val productId: String,
+    @SerializedName("product_name") val productName: String,
+    @SerializedName("user_email") val userEmail: String,
+    @SerializedName("user_name") val userName: String,
+    @SerializedName("rating") val rating: Int,
+    @SerializedName("feedback") val feedback: String
+)
+
+data class DeliveryZone(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String,
+    @SerializedName("delivery_minutes", alternate = ["deliveryMinutes"]) val deliveryMinutes: Int = 30,
+    @SerializedName("late_cashback", alternate = ["lateCashback"]) val lateCashback: Double = 25.0,
+    @SerializedName("coordinates") val coordinates: List<List<List<Double>>> = emptyList()
 )
 
 data class ZoneCollection(
@@ -92,13 +109,38 @@ data class InitStoreResponse(
 )
 
 data class User(
+    @SerializedName("id") val id: String? = null,
     @SerializedName("name") val name: String = "",
     @SerializedName("phone") val phone: String = "",
     @SerializedName("email") val email: String = "",
+    @SerializedName("password") val password: String? = null,
     @SerializedName("address") val address: String = "",
-    @SerializedName("lat") val lat: Double = 0.0,
-    @SerializedName("lng") val lng: Double = 0.0,
-    @SerializedName("walletBalance") val walletBalance: Double = 0.0
+    @SerializedName("reg_lat", alternate = ["lat"]) val lat: Double = 0.0,
+    @SerializedName("reg_lng", alternate = ["lng"]) val lng: Double = 0.0,
+    @SerializedName("wallet_balance", alternate = ["walletBalance"]) val walletBalance: Double = 50.0,
+    @SerializedName("session_token", alternate = ["sessionToken"]) val sessionToken: String? = null,
+    @SerializedName("status") val status: String? = "active"
+)
+
+data class UserSessionUpdate(
+    @SerializedName("session_token") val sessionToken: String,
+    @SerializedName("login_lat") val loginLat: Double? = null,
+    @SerializedName("login_lng") val loginLng: Double? = null
+)
+
+data class UserSessionToken(
+    @SerializedName("session_token") val sessionToken: String? = null
+)
+
+data class UserSignupRequest(
+    @SerializedName("name") val name: String,
+    @SerializedName("phone") val phone: String,
+    @SerializedName("email") val email: String,
+    @SerializedName("password") val password: String,
+    @SerializedName("reg_lat") val regLat: Double,
+    @SerializedName("reg_lng") val regLng: Double,
+    @SerializedName("session_token") val sessionToken: String,
+    @SerializedName("wallet_balance") val walletBalance: Double = 50.0
 )
 
 data class AuthResponse(
@@ -115,27 +157,51 @@ data class CartItem(
 )
 
 data class Order(
-    @SerializedName("orderId") val orderId: String,
+    @SerializedName("order_id", alternate = ["orderId"]) val orderId: String,
     @SerializedName("items") val items: List<CartItem>,
     @SerializedName("subtotal") val subtotal: Double,
-    @SerializedName("deliveryFee") val deliveryFee: Double,
-    @SerializedName("discountAmount") val discountAmount: Double,
-    @SerializedName("walletBurnUsed") val walletBurnUsed: Double,
-    @SerializedName("finalTotal") val finalTotal: Double,
+    @SerializedName("delivery_fee", alternate = ["deliveryFee"]) val deliveryFee: Double,
+    @SerializedName("discount_amount", alternate = ["discountAmount"]) val discountAmount: Double,
+    @SerializedName("wallet_burn_used", alternate = ["walletBurnUsed"]) val walletBurnUsed: Double,
+    @SerializedName("final_total", alternate = ["finalTotal"]) val finalTotal: Double,
     @SerializedName("status") var status: String = "Placed",
-    @SerializedName("orderTimestamp") val orderTimestamp: Long,
-    @SerializedName("etaMinutes") val etaMinutes: Int = 30,
-    @SerializedName("deliveredTimestamp") var deliveredTimestamp: Long? = null,
-    @SerializedName("deliveryAddress") val deliveryAddress: String = "",
-    @SerializedName("userLat") val userLat: Double = 0.0,
-    @SerializedName("userLng") val userLng: Double = 0.0,
-    @SerializedName("riderLat") var riderLat: Double = 0.0,
-    @SerializedName("riderLng") var riderLng: Double = 0.0,
-    @SerializedName("riderPhone") val riderPhone: String = "+91 9876543210",
-    @SerializedName("deliveryToken") val deliveryToken: String = "",
-    @SerializedName("handoverPin") val handoverPin: String = "1234",
-    @SerializedName("receiptPdfUrl") val receiptPdfUrl: String? = null,
-    @SerializedName("isLateCashbackCredited") var isLateCashbackCredited: Boolean = false
+    @SerializedName("order_timestamp", alternate = ["orderTimestamp", "created_at"]) val orderTimestamp: Long,
+    @SerializedName("eta_minutes", alternate = ["etaMinutes"]) val etaMinutes: Int = 30,
+    @SerializedName("delivered_timestamp", alternate = ["deliveredTimestamp"]) var deliveredTimestamp: Long? = null,
+    @SerializedName("delivery_address", alternate = ["deliveryAddress"]) val deliveryAddress: String = "",
+    @SerializedName("user_lat", alternate = ["userLat"]) val userLat: Double = 0.0,
+    @SerializedName("user_lng", alternate = ["userLng"]) val userLng: Double = 0.0,
+    @SerializedName("rider_lat", alternate = ["riderLat"]) var riderLat: Double = 0.0,
+    @SerializedName("rider_lng", alternate = ["riderLng"]) var riderLng: Double = 0.0,
+    @SerializedName("rider_phone", alternate = ["riderPhone"]) val riderPhone: String = "+91 9876543210",
+    @SerializedName("delivery_token", alternate = ["deliveryToken"]) val deliveryToken: String = "",
+    @SerializedName("handover_pin", alternate = ["handoverPin"]) val handoverPin: String = "1234",
+    @SerializedName("receipt_pdf_url", alternate = ["receiptPdfUrl"]) val receiptPdfUrl: String? = null,
+    @SerializedName("is_late_cashback_credited", alternate = ["isLateCashbackCredited"]) var isLateCashbackCredited: Boolean = false,
+    @SerializedName("user_email") val userEmail: String? = null
+)
+
+data class PlaceOrderRpcPayload(
+    @SerializedName("p_order_id") val pOrderId: String,
+    @SerializedName("p_items") val pItems: List<CartItem>,
+    @SerializedName("p_wallet_deduction") val pWalletDeduction: Double,
+    @SerializedName("p_subtotal") val pSubtotal: Double,
+    @SerializedName("p_delivery_fee") val pDeliveryFee: Double,
+    @SerializedName("p_discount_amount") val pDiscountAmount: Double,
+    @SerializedName("p_final_total") val pFinalTotal: Double,
+    @SerializedName("p_user_email") val pUserEmail: String,
+    @SerializedName("p_user_address") val pUserAddress: String,
+    @SerializedName("p_user_lat") val pUserLat: Double,
+    @SerializedName("p_user_lng") val pUserLng: Double,
+    @SerializedName("p_delivery_token") val pDeliveryToken: String,
+    @SerializedName("p_handover_pin") val pHandoverPin: String,
+    @SerializedName("p_eta_minutes") val pEtaMinutes: Int
+)
+
+data class PlaceOrderResponse(
+    @SerializedName("status") val status: String = "success",
+    @SerializedName("order_id", alternate = ["orderId"]) val orderId: String? = null,
+    @SerializedName("message") val message: String? = null
 )
 
 data class SaveOrderResponse(

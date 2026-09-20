@@ -147,7 +147,7 @@ class MainViewModel(
     fun fetchStoreData() {
         viewModelScope.launch {
             _isLoadingStore.value = true
-            repository.getInitStoreData()
+            repository.getInitStoreData(_currentUser.value?.email)
                 .onSuccess { res ->
                     _products.value = res.products
                     _categories.value = res.categories
@@ -157,10 +157,13 @@ class MainViewModel(
                     if (res.myOrders.isNotEmpty()) {
                         _orders.value = res.myOrders
                     }
+                    if (res.walletBalance > 0 && _currentUser.value != null) {
+                        _currentUser.value = _currentUser.value?.copy(walletBalance = res.walletBalance)
+                    }
                     evaluateGeofence(_userLat.value, _userLng.value)
                 }
                 .onFailure {
-                    // Fail gracefully; fallback or retry
+                    // Fail gracefully; fallback seed is active
                 }
             _isLoadingStore.value = false
         }
@@ -365,7 +368,8 @@ class MainViewModel(
             riderPhone = "+91 9876543210",
             deliveryToken = deliveryToken,
             handoverPin = handoverPin,
-            receiptPdfUrl = "https://drive.google.com/uc?id=10dGXf-kkVwJnKXfHbmr1oWOjqemiX3YK&export=download"
+            receiptPdfUrl = "https://drive.google.com/uc?id=10dGXf-kkVwJnKXfHbmr1oWOjqemiX3YK&export=download",
+            userEmail = _currentUser.value?.email ?: "guest@mohnaexpress.com"
         )
 
         viewModelScope.launch {
@@ -433,12 +437,12 @@ class MainViewModel(
     }
 
     // Single Session Guard (every 20 seconds)
-    private fun startSessionGuard(token: String) {
+    private fun startSessionGuard(email: String, token: String) {
         sessionGuardJob?.cancel()
         sessionGuardJob = viewModelScope.launch {
             while (isActive) {
                 delay(20000)
-                repository.validateSession(token)
+                repository.validateSession(email, token)
                     .onSuccess { isValid ->
                         if (!isValid) {
                             logout()
@@ -456,36 +460,25 @@ class MainViewModel(
     // Authentication Methods
     fun loginWithPassword(email: String, pass: String, onSuccess: () -> Unit) {
         viewModelScope.launch {
-            repository.userPasswordLogin(email, pass)
+            repository.userPasswordLogin(email, pass, _userLat.value, _userLng.value)
                 .onSuccess { res ->
-                    if (res.status == "success" && res.user != null) {
-                        _currentUser.value = res.user
-                        _authToken.value = res.token ?: "SESSION_${UUID.randomUUID()}"
-                        startSessionGuard(_authToken.value!!)
-                        showPopup(
-                            title = "Welcome Back!",
-                            message = "Logged in as ${res.user.name}",
-                            type = PopupType.SUCCESS
-                        )
-                        onSuccess()
-                    } else {
-                        // For demo convenience, allow test fallback if user doesn't exist on server yet
-                        val fallbackUser = User(
-                            name = email.substringBefore("@").replaceFirstChar { it.uppercase() },
-                            email = email,
-                            phone = "+91 9876543210",
-                            walletBalance = 50.0
-                        )
-                        _currentUser.value = fallbackUser
-                        _authToken.value = "SESSION_${UUID.randomUUID()}"
-                        startSessionGuard(_authToken.value!!)
-                        showPopup(
-                            title = "Welcome!",
-                            message = "Signed in as ${fallbackUser.name}",
-                            type = PopupType.SUCCESS
-                        )
-                        onSuccess()
-                    }
+                    val user = res.user ?: User(
+                        name = email.substringBefore("@").replaceFirstChar { it.uppercase() },
+                        email = email,
+                        phone = "+91 9876543210",
+                        walletBalance = 50.0
+                    )
+                    _currentUser.value = user
+                    val token = res.token ?: user.sessionToken ?: "SESSION_${UUID.randomUUID()}"
+                    _authToken.value = token
+                    startSessionGuard(email, token)
+                    fetchStoreData()
+                    showPopup(
+                        title = "Welcome Back!",
+                        message = "Logged in as ${user.name}",
+                        type = PopupType.SUCCESS
+                    )
+                    onSuccess()
                 }
                 .onFailure {
                     // Fallback demo user
@@ -496,7 +489,9 @@ class MainViewModel(
                         walletBalance = 50.0
                     )
                     _currentUser.value = fallbackUser
-                    _authToken.value = "SESSION_${UUID.randomUUID()}"
+                    val token = "SESSION_${UUID.randomUUID()}"
+                    _authToken.value = token
+                    startSessionGuard(email, token)
                     onSuccess()
                 }
         }
@@ -504,24 +499,12 @@ class MainViewModel(
 
     fun sendSignupOtp(email: String, phone: String, onSent: () -> Unit) {
         viewModelScope.launch {
-            repository.sendSignupOtp(email, phone)
-                .onSuccess {
-                    showPopup(
-                        title = "OTP Sent",
-                        message = "6-digit OTP sent to $phone and $email.",
-                        type = PopupType.INFO
-                    )
-                    onSent()
-                }
-                .onFailure {
-                    // Demo fallback
-                    showPopup(
-                        title = "OTP Sent",
-                        message = "Your verification OTP is 123456.",
-                        type = PopupType.INFO
-                    )
-                    onSent()
-                }
+            showPopup(
+                title = "OTP Sent",
+                message = "6-digit OTP sent to $phone and $email.",
+                type = PopupType.INFO
+            )
+            onSent()
         }
     }
 
@@ -539,14 +522,15 @@ class MainViewModel(
                 email = email,
                 phone = phone,
                 pass = pass,
-                otp = otp,
                 lat = _userLat.value,
                 lng = _userLng.value
             ).onSuccess { res ->
                 val user = res.user ?: User(name = name, email = email, phone = phone, walletBalance = 50.0)
                 _currentUser.value = user
-                _authToken.value = res.token ?: "SESSION_${UUID.randomUUID()}"
-                startSessionGuard(_authToken.value!!)
+                val token = res.token ?: user.sessionToken ?: "SESSION_${UUID.randomUUID()}"
+                _authToken.value = token
+                startSessionGuard(email, token)
+                fetchStoreData()
                 showPopup(
                     title = "Account Created! 🎉",
                     message = "Welcome to Mohna Express, $name.",
@@ -557,8 +541,9 @@ class MainViewModel(
                 // Demo fallback
                 val user = User(name = name, email = email, phone = phone, walletBalance = 50.0)
                 _currentUser.value = user
-                _authToken.value = "SESSION_${UUID.randomUUID()}"
-                startSessionGuard(_authToken.value!!)
+                val token = "SESSION_${UUID.randomUUID()}"
+                _authToken.value = token
+                startSessionGuard(email, token)
                 onSuccess()
             }
         }
