@@ -107,7 +107,7 @@ interface ApiService {
 
     companion object {
         const val SUPABASE_URL = "https://zselflcfndhlkmwbohxm.supabase.co"
-        const val SUPABASE_ANON_KEY = "zselflcfndhlkmwbohxm"
+        const val SUPABASE_ANON_KEY = "sb_publishable_qUhv9P7aylCNhouahNCCqA_6vnwt178"
 
         fun create(): ApiService {
             val logging = HttpLoggingInterceptor().apply {
