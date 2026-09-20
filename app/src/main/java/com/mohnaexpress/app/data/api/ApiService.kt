@@ -106,8 +106,8 @@ interface ApiService {
     ): retrofit2.Response<Unit>
 
     companion object {
-        const val SUPABASE_URL = "https://YOUR_PROJECT_REF.supabase.co/rest/v1/"
-        const val SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY"
+        const val SUPABASE_URL = "https://zselflcfndhlkmwbohxm.supabase.co"
+        const val SUPABASE_ANON_KEY = "zselflcfndhlkmwbohxm"
 
         fun create(): ApiService {
             val logging = HttpLoggingInterceptor().apply {
